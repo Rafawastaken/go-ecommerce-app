@@ -14,6 +14,10 @@ type VerificationCodeInput struct {
 	Code string `json:"code"`
 }
 
+type GetVerificationCodeInput struct {
+	Email string `json:"string"`
+}
+
 type SellerInput struct {
 	FirstName         string `json:"first_name"`
 	LastName          string `json:"last_name"`

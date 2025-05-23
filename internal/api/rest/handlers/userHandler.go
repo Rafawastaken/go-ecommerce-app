@@ -3,6 +3,7 @@ package handlers
 import (
 	"go-ecommerce-app/internal/api/rest"
 	"go-ecommerce-app/internal/dto"
+	"go-ecommerce-app/internal/repository"
 	"go-ecommerce-app/internal/service"
 	"net/http"
 
@@ -17,7 +18,9 @@ func SetupUserRoutes(rh *rest.RestHandler) {
 	app := rh.App
 
 	// Create an instance of user service and inject to handler
-	svc := service.UserService{}
+	svc := service.UserService{
+		Repo: repository.NewUserRepository(rh.DB),
+	}
 
 	handler := UserHandler{
 		svc: svc,
@@ -56,7 +59,7 @@ func (h *UserHandler) Register(ctx *fiber.Ctx) error {
 
 	if err != nil {
 		return ctx.Status(http.StatusInternalServerError).JSON(&fiber.Map{
-			"message": "error creating account",
+			"message": err.Error(),
 		})
 	}
 
@@ -75,22 +78,23 @@ func (h *UserHandler) Login(ctx *fiber.Ctx) error {
 		})
 	}
 
-	token, err := h.svc.Login(user)
+	token, err := h.svc.Login(user.Email, user.Password)
 
 	if err != nil {
-		return ctx.Status(http.StatusInternalServerError).JSON(&fiber.Map{
-			"message": "error logging in",
+		return ctx.Status(http.StatusUnauthorized).JSON(&fiber.Map{
+			"message": "please provide valid input",
 		})
 	}
 
 	return ctx.Status(http.StatusOK).JSON(&fiber.Map{
-		"message": token,
+		"message": "logged in",
+		"token":   token,
 	})
 }
 
 func (h *UserHandler) GetVerificationCode(ctx *fiber.Ctx) error {
 	return ctx.Status(http.StatusOK).JSON(&fiber.Map{
-		"message": "GetVerificationCode",
+		"message": "Get Verification Code",
 	})
 }
 

@@ -1,26 +1,50 @@
 package service
 
 import (
+	"fmt"
 	"go-ecommerce-app/internal/domain"
 	"go-ecommerce-app/internal/dto"
+	"go-ecommerce-app/internal/repository"
 	"log"
 )
 
 type UserService struct {
+	Repo repository.UserRepository
 }
 
-func (s UserService) FindUserByEmail(email string) (*domain.User, error) {
-	return nil, nil
+func (s UserService) findUserByEmail(email string) (*domain.User, error) {
+	user, err := s.Repo.FindUser(email)
+
+	return &user, err
 }
 
 func (s UserService) SignUp(input dto.UserSignup) (string, error) {
-	log.Println(input)
-	return "this-is-a-token-for-now", nil
+	log.Printf("create user: %v\n", input)
+
+	user, err := s.Repo.CreateUser(domain.User{
+		Email:    input.Email,
+		Password: input.Password,
+		Phone:    input.Phone,
+	})
+
+	//Generate token
+	log.Printf("user created: %v\n", user)
+	userInfo := fmt.Sprintf("%v, %v, %v", user.ID, user.Email, user.UserType)
+
+	return userInfo, err
 }
 
-func (s UserService) Login(input dto.UserLogin) (string, error) {
-	log.Println(input)
-	return "this-is-a-token-for-now", nil
+func (s UserService) Login(email string, password string) (string, error) {
+	log.Printf("login user: %v\n", email)
+	user, err := s.findUserByEmail(email)
+
+	// Compare password and generate error
+
+	if err != nil {
+		return "user does not exist", err
+	}
+
+	return user.Email, nil
 }
 
 func (s UserService) GetVerificationCode(e domain.User) (int, error) {
