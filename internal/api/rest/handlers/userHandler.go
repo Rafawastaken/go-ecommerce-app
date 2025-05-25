@@ -5,6 +5,7 @@ import (
 	"go-ecommerce-app/internal/dto"
 	"go-ecommerce-app/internal/repository"
 	"go-ecommerce-app/internal/service"
+	"log"
 	"net/http"
 
 	"github.com/gofiber/fiber/v2"
@@ -20,6 +21,7 @@ func SetupUserRoutes(rh *rest.RestHandler) {
 	// Create an instance of user service and inject to handler
 	svc := service.UserService{
 		Repo: repository.NewUserRepository(rh.DB),
+		Auth: rh.Auth,
 	}
 
 	handler := UserHandler{
@@ -27,22 +29,22 @@ func SetupUserRoutes(rh *rest.RestHandler) {
 	}
 
 	// Public Endpoints
-	app.Post("/register", handler.Register)
-	app.Post("/login", handler.Login)
+	pubRoutes := app.Group("/user")
+	pubRoutes.Post("/register", handler.Register)
+	pubRoutes.Post("/login", handler.Login)
 
 	// Private Endpoints
-	app.Get("/verify", handler.GetVerificationCode)
-	app.Post("/verify", handler.Verify)
-	app.Get("/profile", handler.GetProfile)
-	app.Post("/profile", handler.CreateProfile)
-
-	app.Post("/cart", handler.AddToCart)
-	app.Get("/cart", handler.GetCart)
-	app.Post("/order", handler.CreateOrder)
-	app.Get("/order", handler.GetOrders)
-	app.Get("/order/:id", handler.GetOrder)
-
-	app.Post("/become-seller", handler.BecomeSeller)
+	pvtRoutes := app.Group("/", rh.Auth.Authorize)
+	pvtRoutes.Get("/verify", handler.GetVerificationCode)
+	pvtRoutes.Post("/verify", handler.Verify)
+	pvtRoutes.Get("/profile", handler.GetProfile)
+	pvtRoutes.Post("/profile", handler.CreateProfile)
+	pvtRoutes.Post("/cart", handler.AddToCart)
+	pvtRoutes.Get("/cart", handler.GetCart)
+	pvtRoutes.Post("/order", handler.CreateOrder)
+	pvtRoutes.Get("/order", handler.GetOrders)
+	pvtRoutes.Get("/order/:id", handler.GetOrder)
+	pvtRoutes.Post("/become-seller", handler.BecomeSeller)
 }
 
 func (h *UserHandler) Register(ctx *fiber.Ctx) error {
@@ -58,13 +60,15 @@ func (h *UserHandler) Register(ctx *fiber.Ctx) error {
 	token, err := h.svc.SignUp(user)
 
 	if err != nil {
+		log.Println(err.Error())
 		return ctx.Status(http.StatusInternalServerError).JSON(&fiber.Map{
 			"message": err.Error(),
 		})
 	}
 
 	return ctx.Status(http.StatusOK).JSON(&fiber.Map{
-		"message": token,
+		"message": "success",
+		"token":   token,
 	})
 }
 
@@ -73,8 +77,11 @@ func (h *UserHandler) Login(ctx *fiber.Ctx) error {
 	err := ctx.BodyParser(&user)
 
 	if err != nil {
+		log.Println(err.Error())
+
 		return ctx.Status(http.StatusBadRequest).JSON(&fiber.Map{
 			"message": "please provide valid input",
+			"error":   err.Error(),
 		})
 	}
 
@@ -82,7 +89,7 @@ func (h *UserHandler) Login(ctx *fiber.Ctx) error {
 
 	if err != nil {
 		return ctx.Status(http.StatusUnauthorized).JSON(&fiber.Map{
-			"message": "please provide valid input",
+			"message": err.Error(),
 		})
 	}
 
@@ -111,8 +118,17 @@ func (h *UserHandler) CreateProfile(ctx *fiber.Ctx) error {
 }
 
 func (h *UserHandler) GetProfile(ctx *fiber.Ctx) error {
+	user, err := h.svc.Auth.GetCurrentUser(ctx)
+
+	if err != nil {
+		return ctx.Status(http.StatusNotFound).JSON(&fiber.Map{
+			"message": err.Error(),
+		})
+	}
+
 	return ctx.Status(http.StatusOK).JSON(&fiber.Map{
-		"message": "GetProfile",
+		"message": "success",
+		"user":    user,
 	})
 }
 
@@ -151,3 +167,5 @@ func (h *UserHandler) BecomeSeller(ctx *fiber.Ctx) error {
 		"message": "BecomeSeller",
 	})
 }
+
+//https://youtu.be/_dMYe8clBBE?si=7ebEGXn4R-KwPWnv&t=2587
