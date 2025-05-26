@@ -100,14 +100,58 @@ func (h *UserHandler) Login(ctx *fiber.Ctx) error {
 }
 
 func (h *UserHandler) GetVerificationCode(ctx *fiber.Ctx) error {
+	user, err := h.svc.Auth.GetCurrentUser(ctx)
+
+	if err != nil {
+		return ctx.Status(http.StatusUnauthorized).JSON(&fiber.Map{
+			"message": err.Error(),
+		})
+	}
+
+	code, err := h.svc.GetVerificationCode(user)
+
+	if err != nil {
+		return ctx.Status(http.StatusInternalServerError).JSON(&fiber.Map{
+			"message": "could not get verification code",
+			"error":   err.Error(),
+		})
+	}
+
 	return ctx.Status(http.StatusOK).JSON(&fiber.Map{
 		"message": "Get Verification Code",
+		"data":    code,
 	})
 }
 
 func (h *UserHandler) Verify(ctx *fiber.Ctx) error {
+	user, err := h.svc.Auth.GetCurrentUser(ctx)
+
+	if err != nil {
+		return ctx.Status(http.StatusUnauthorized).JSON(&fiber.Map{
+			"message": err.Error(),
+		})
+	}
+
+	var req dto.VerificationCodeInput
+
+	if err := ctx.BodyParser(&req); err != nil {
+		return ctx.Status(http.StatusBadRequest).JSON(&fiber.Map{
+			"message": "please provide valid input",
+			"error":   err.Error(),
+		})
+	}
+
+	err = h.svc.VerifyCode(user.ID, req.Code)
+
+	if err != nil {
+		return ctx.Status(http.StatusInternalServerError).JSON(&fiber.Map{
+			"message": "could not verify code",
+			"error":   err.Error(),
+		})
+	}
+
 	return ctx.Status(http.StatusOK).JSON(&fiber.Map{
-		"message": "Verify",
+		"message": "verified successfully",
 	})
 }
 
@@ -167,5 +211,3 @@ func (h *UserHandler) BecomeSeller(ctx *fiber.Ctx) error {
 		"message": "BecomeSeller",
 	})
 }
-
-//https://youtu.be/_dMYe8clBBE?si=7ebEGXn4R-KwPWnv&t=2587
