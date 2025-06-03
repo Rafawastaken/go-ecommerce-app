@@ -130,11 +130,31 @@ func (a Auth) Authorize(ctx *fiber.Ctx) error {
 	return ctx.Next()
 }
 
-func (a Auth) GetCurrentUser(ctx *fiber.Ctx) (domain.User, error) {
-	user := ctx.Locals("user").(domain.User)
-	return user, nil
+func (a Auth) GetCurrentUser(ctx *fiber.Ctx) domain.User {
+	user := ctx.Locals("user")
+	return user.(domain.User)
 }
 
 func (a Auth) GenerateCode() (int, error) {
 	return RandomNumbers(6)
+}
+
+func (a Auth) AuthorizeSeller(ctx *fiber.Ctx) error {
+	authHeader := ctx.Get("Authorization")
+	user, err := a.VerifyToken(authHeader)
+
+	if err != nil {
+		return ctx.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"message": "unauthorized",
+			"reason":  err,
+		})
+	} else if user.ID > 0 && user.UserType == domain.SELLER {
+		ctx.Locals("user", user)
+		return ctx.Next()
+	} else {
+		return ctx.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"message": "unauthorized",
+			"reason":  errors.New("invalid user type"),
+		})
+	}
 }

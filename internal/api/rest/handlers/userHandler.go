@@ -20,8 +20,9 @@ func SetupUserRoutes(rh *rest.RestHandler) {
 
 	// Create an instance of user service and inject to handler
 	svc := service.UserService{
-		Repo: repository.NewUserRepository(rh.DB),
-		Auth: rh.Auth,
+		Repo:   repository.NewUserRepository(rh.DB),
+		Auth:   rh.Auth,
+		Config: rh.Config,
 	}
 
 	handler := UserHandler{
@@ -100,15 +101,9 @@ func (h *UserHandler) Login(ctx *fiber.Ctx) error {
 }
 
 func (h *UserHandler) GetVerificationCode(ctx *fiber.Ctx) error {
-	user, err := h.svc.Auth.GetCurrentUser(ctx)
+	user := h.svc.Auth.GetCurrentUser(ctx)
 
-	if err != nil {
-		return ctx.Status(http.StatusUnauthorized).JSON(&fiber.Map{
-			"message": err.Error(),
-		})
-	}
-
-	code, err := h.svc.GetVerificationCode(user)
+	err := h.svc.GetVerificationCode(user)
 
 	if err != nil {
 		return ctx.Status(http.StatusInternalServerError).JSON(&fiber.Map{
@@ -118,19 +113,12 @@ func (h *UserHandler) GetVerificationCode(ctx *fiber.Ctx) error {
 	}
 
 	return ctx.Status(http.StatusOK).JSON(&fiber.Map{
-		"message": "Get Verification Code",
-		"data":    code,
+		"message": "Code sent successfully",
 	})
 }
 
 func (h *UserHandler) Verify(ctx *fiber.Ctx) error {
-	user, err := h.svc.Auth.GetCurrentUser(ctx)
-
-	if err != nil {
-		return ctx.Status(http.StatusUnauthorized).JSON(&fiber.Map{
-			"message": err.Error(),
-		})
-	}
+	user := h.svc.Auth.GetCurrentUser(ctx)
 
 	var req dto.VerificationCodeInput
 
@@ -141,7 +129,7 @@ func (h *UserHandler) Verify(ctx *fiber.Ctx) error {
 		})
 	}
 
-	err = h.svc.VerifyCode(user.ID, req.Code)
+	err := h.svc.VerifyCode(user.ID, req.Code)
 
 	if err != nil {
 		return ctx.Status(http.StatusInternalServerError).JSON(&fiber.Map{
@@ -162,13 +150,7 @@ func (h *UserHandler) CreateProfile(ctx *fiber.Ctx) error {
 }
 
 func (h *UserHandler) GetProfile(ctx *fiber.Ctx) error {
-	user, err := h.svc.Auth.GetCurrentUser(ctx)
-
-	if err != nil {
-		return ctx.Status(http.StatusNotFound).JSON(&fiber.Map{
-			"message": err.Error(),
-		})
-	}
+	user := h.svc.Auth.GetCurrentUser(ctx)
 
 	return ctx.Status(http.StatusOK).JSON(&fiber.Map{
 		"message": "success",
@@ -207,7 +189,28 @@ func (h *UserHandler) GetOrder(ctx *fiber.Ctx) error {
 }
 
 func (h *UserHandler) BecomeSeller(ctx *fiber.Ctx) error {
+	user := h.svc.Auth.GetCurrentUser(ctx)
+
+	req := dto.SellerInput{}
+	err := ctx.BodyParser(&req)
+
+	if err != nil {
+		return ctx.Status(400).JSON(&fiber.Map{
+			"message": "request parameters are not valid",
+		})
+	}
+
+	token, err := h.svc.BecomeSeller(user.ID, req)
+
+	if err != nil {
+		return ctx.Status(http.StatusUnauthorized).JSON(&fiber.Map{
+			"message": "fail to become seller",
+			"error":   err.Error(),
+		})
+	}
+
 	return ctx.Status(http.StatusOK).JSON(&fiber.Map{
-		"message": "BecomeSeller",
+		"message": "become seller",
+		"token":   token,
 	})
 }

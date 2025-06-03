@@ -8,9 +8,12 @@ import (
 )
 
 type AppConfig struct {
-	ServerPort string
-	Dsn        string
-	AppSecret  string
+	ServerPort        string
+	Dsn               string
+	AppSecret         string
+	TwilioAccountSid  string
+	TwilioAuthToken   string
+	TwilioPhoneNumber string
 }
 
 func SetupEnv() (cfg AppConfig, err error) {
@@ -26,6 +29,9 @@ func SetupEnv() (cfg AppConfig, err error) {
 
 	Dsn := os.Getenv("DSN")
 	appSecret := os.Getenv("APP_SECRET")
+	TwilioAccountSid := os.Getenv("TWILIO_ACCOUNT_SID")
+	TwilioAuthToken := os.Getenv("TWILIO_AUTH_TOKEN")
+	TwilioPhoneNumber := os.Getenv("TWILIO_PHONE_NUMBER")
 
 	if len(Dsn) < 1 {
 		return AppConfig{}, errors.New("dsn variables not found")
@@ -34,5 +40,5 @@ func SetupEnv() (cfg AppConfig, err error) {
 		return AppConfig{}, errors.New("appSecret variable not found")
 	}
 
-	return AppConfig{ServerPort: httpPort, Dsn: Dsn, AppSecret: appSecret}, nil
+	return AppConfig{ServerPort: httpPort, Dsn: Dsn, AppSecret: appSecret, TwilioAccountSid: TwilioAccountSid, TwilioAuthToken: TwilioAuthToken, TwilioPhoneNumber: TwilioPhoneNumber}, nil
 }

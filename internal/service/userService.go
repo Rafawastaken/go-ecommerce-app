@@ -2,17 +2,21 @@ package service
 
 import (
 	"errors"
+	"fmt"
+	"go-ecommerce-app/config"
 	"go-ecommerce-app/internal/domain"
 	"go-ecommerce-app/internal/dto"
 	"go-ecommerce-app/internal/helper"
 	"go-ecommerce-app/internal/repository"
+	"go-ecommerce-app/pkg/notifications"
 	"log"
 	"time"
 )
 
 type UserService struct {
-	Repo repository.UserRepository
-	Auth helper.Auth
+	Repo   repository.UserRepository
+	Auth   helper.Auth
+	Config config.AppConfig
 }
 
 func (s UserService) findUserByEmail(email string) (*domain.User, error) {
@@ -41,19 +45,23 @@ func (s UserService) SignUp(input dto.UserSignup) (string, error) {
 }
 
 func (s UserService) Login(email string, password string) (string, error) {
-	log.Printf("login user: %v\n", email)
+	log.Printf("Login attempt for user: %s\n", email)
+
 	user, err := s.findUserByEmail(email)
-
 	if err != nil {
-		return "", errors.New("User not found")
+		return "", errors.New("user not found")
 	}
 
-	err = s.Auth.VerifyPassword(password, user.Password)
-	if err != nil {
-		return "", err
+	if err := s.Auth.VerifyPassword(password, user.Password); err != nil {
+		return "", errors.New("wrong password")
 	}
 
-	return s.Auth.GenerateToken(user.ID, user.Email, user.UserType)
+	token, err := s.Auth.GenerateToken(user.ID, user.Email, user.UserType)
+	if err != nil {
+		return "", errors.New("error while generating token")
+	}
+
+	return token, nil
 }
 
 func (s UserService) isVerifiedUser(id uint) bool {
@@ -61,17 +69,17 @@ func (s UserService) isVerifiedUser(id uint) bool {
 	return err == nil && currentUser.Verified
 }
 
-func (s UserService) GetVerificationCode(e domain.User) (int, error) {
+func (s UserService) GetVerificationCode(e domain.User) error {
 	//check if user is verified
 	if s.isVerifiedUser(e.ID) {
-		return 0, errors.New("user is verified")
+		return errors.New("user is verified")
 	}
 
 	//generate verification code
 	code, err := s.Auth.GenerateCode()
 
 	if err != nil {
-		return 0, nil
+		return nil
 	}
 
 	//update user
@@ -83,12 +91,23 @@ func (s UserService) GetVerificationCode(e domain.User) (int, error) {
 	_, err = s.Repo.UpdateUser(e.ID, user)
 
 	if err != nil {
-		return 0, errors.New("unable to update verification code")
+		return errors.New("unable to update verification code")
 	}
 
-	//Send SMS
+	//get the user phone
+	user, _ = s.Repo.FindUserById(e.ID)
 
-	return code, nil
+	//send sms
+	notificationClient := notifications.NewNotificationClient(s.Config)
+	message := fmt.Sprintf("Verification code: %v", code)
+	err = notificationClient.SendSMS(user.Phone, message)
+
+	if err != nil {
+		log.Printf("Unable to send verification code: %v", err)
+		return errors.New("unable to send verification code")
+	}
+
+	return nil
 }
 
 func (s UserService) VerifyCode(id uint, code int) error {
@@ -133,8 +152,38 @@ func (s UserService) UpdateProfile(id uint, input any) (*domain.User, error) {
 	return nil, nil
 }
 
-func (s UserService) BecomeSeller(id uint, input any) (string, error) {
-	return "", nil
+func (s UserService) BecomeSeller(id uint, input dto.SellerInput) (string, error) {
+	user, _ := s.Repo.FindUserById(id)
+
+	if user.UserType == domain.SELLER {
+		return "", errors.New("you have already joined seller program")
+	}
+
+	seller, err := s.Repo.UpdateUser(id, domain.User{
+		FirstName: user.FirstName,
+		LastName:  user.LastName,
+		Phone:     user.Phone,
+		UserType:  domain.SELLER,
+	})
+
+	if err != nil {
+		return "", err
+	}
+
+	token, err := s.Auth.GenerateToken(user.ID, user.Email, seller.UserType)
+
+	err = s.Repo.CreateBankAccount(domain.BankAccount{
+		BankAccountNumber: input.BankAccountNumber,
+		SwiftCode:         input.SwiftCode,
+		PaymentType:       input.PaymentType,
+		UserID:            id,
+	})
+
+	if err != nil {
+		return "", err
+	}
+
+	return token, nil
 }
 
 func (s UserService) FindCart(id uint) ([]interface{}, error) {

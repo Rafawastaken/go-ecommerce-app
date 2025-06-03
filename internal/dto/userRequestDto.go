@@ -22,9 +22,9 @@ type SellerInput struct {
 	FirstName         string `json:"first_name"`
 	LastName          string `json:"last_name"`
 	PhoneNumber       string `json:"phone_number"`
-	BankAccountNumber uint   `json:"bankAccountNumber"`
-	SwiftCode         string `json:"swiftCode"`
-	PaymentType       string `json:"paymentType"`
+	BankAccountNumber uint   `json:"bank_account_number"`
+	SwiftCode         string `json:"swift_code"`
+	PaymentType       string `json:"payment_type"`
 }
 
 type AddressInput struct {

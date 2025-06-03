@@ -14,6 +14,8 @@ type UserRepository interface {
 	FindUserById(id uint) (domain.User, error)
 	UpdateUser(id uint, usr domain.User) (domain.User, error)
 	GetVerificationCode(email string) (int, error)
+
+	CreateBankAccount(e domain.BankAccount) error
 }
 
 type userRepository struct {
@@ -63,7 +65,7 @@ func (r userRepository) FindUserById(id uint) (domain.User, error) {
 func (r userRepository) UpdateUser(id uint, usr domain.User) (domain.User, error) {
 	var user domain.User
 
-	err := r.db.Model(&user).Clauses(clause.Returning{}).Where("id = ?", id).Updates(&usr).Error
+	err := r.db.Model(&user).Clauses(clause.Returning{}).Where("id = ?", id).Updates(usr).Error
 
 	if err != nil {
 		log.Printf("database error while updating user: %v\n", err)
@@ -89,4 +91,8 @@ func (r userRepository) GetVerificationCode(email string) (int, error) {
 	}
 
 	return 1245, nil
+}
+
+func (r userRepository) CreateBankAccount(e domain.BankAccount) error {
+	return r.db.Create(&e).Error
 }
